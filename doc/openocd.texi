@@ -7435,6 +7435,49 @@ flash bank $_FLASHNAME cc3220sf 0 0 0 0 $_TARGETNAME
 @end example
 @end deffn
 
+@deffn {Flash Driver} {ch32v}
+This driver supports the internal flash of the WCH CH32V003, the CH32V00X
+family (CH32V002, CH32V004, CH32V005, CH32V006, CH32V007) and the CH32V20x
+family. These are RISC-V microcontrollers. The driver reads the chip ID and
+the flash size from the chip, and uses the fast page programming of the flash
+controller. Pages are 64 bytes on the CH32V003 and 256 bytes on the other
+families. Writes run a small loader in the working area, which must hold the
+loader and at least one page.
+
+The bank base must be 0x08000000. On the CH32V20x, erased flash reads
+0xe339e339, not 0xffffffff. @command{flash erase_check} knows this.
+
+@example
+flash bank $_FLASHNAME ch32v 0x08000000 0 0 0 $_TARGETNAME
+@end example
+
+@command{flash protect} changes the write protection bytes of the option
+bytes. Changes to the option bytes take effect after a reset of the target.
+
+@deffn {Command} {ch32v mass_erase} bank_id
+Erases the entire flash.
+@end deffn
+
+@deffn {Command} {ch32v lock} bank_id
+Sets the read protection (RDPR 0x00). After a reset, the debugger cannot
+read the flash.
+@end deffn
+
+@deffn {Command} {ch32v unlock} bank_id
+Removes the read protection and the write protection (RDPR 0xa5, all WRPR
+bits 1). On a read protected chip, the chip erases its flash.
+@end deffn
+
+@deffn {Command} {ch32v options_read} bank_id
+Shows the option bytes and the registers FLASH_OBR and FLASH_WPR.
+@end deffn
+
+@deffn {Command} {ch32v options_write} bank_id user_byte [data0 data1]
+Writes the USER option byte and, optionally, the user data bytes DATA0 and
+DATA1. The other option bytes do not change.
+@end deffn
+@end deffn
+
 @deffn {Flash Driver} {efm32}
 All members of the EFM32/EFR32 microcontroller family from Silicon Labs (former
 Energy Micro) include internal flash and use Arm Cortex-M3, Cortex-M4 or
