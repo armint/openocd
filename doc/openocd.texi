@@ -12039,6 +12039,25 @@ Defaults to @option{off}.
 @end itemize
 @end itemize
 
+@itemize
+@item @code{-ignore-tdata1-dmode} @option{off}|@option{on} -- determines
+whether OpenOCD accepts a trigger that reads back @var{tdata1.dmode} as 0
+after OpenOCD wrote it as 1. When @option{on}, OpenOCD uses such a trigger,
+and M-mode code can change it. When OpenOCD first enumerates the triggers
+(at the first halt on a trigger, breakpoint or watchpoint change, step or
+@command{riscv info}),
+it then also clears the triggers with the action ``enter Debug Mode'',
+because a debugger left them.
+Use this only for a hart that hardwires @var{dmode} to 0 although its
+triggers enter Debug Mode, e.g. the WCH QingKe V4. The debug spec allows
+the action ``enter Debug Mode'' only with @var{dmode} 1, so on a compliant
+hart such a trigger does not halt the hart. Defaults to @option{off}.
+
+@itemize
+@item @code{cget} returns the currently configured state for @code{-ignore-tdata1-dmode}.
+@end itemize
+@end itemize
+
 @subsection RISC-V Debug Configuration Commands
 
 @deffn {Command} {riscv dump_sample_buf} [base64]

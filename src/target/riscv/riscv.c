@@ -632,6 +632,7 @@ enum riscv_cfg_opts {
 	RISCV_CFG_DETECT_MISA,
 	RISCV_CFG_SBA_FLUSH_CACHE,
 	RISCV_CFG_IGNORE_TINFO,
+	RISCV_CFG_IGNORE_TDATA1_DMODE,
 	RISCV_CFG_INVALID = -1
 };
 
@@ -641,6 +642,7 @@ static struct jim_nvp nvp_config_opts[] = {
 	{ .name = "-detect-misa", .value = RISCV_CFG_DETECT_MISA },
 	{ .name = "-sba-flush-cache", .value = RISCV_CFG_SBA_FLUSH_CACHE },
 	{ .name = "-ignore-tinfo", .value = RISCV_CFG_IGNORE_TINFO },
+	{ .name = "-ignore-tdata1-dmode", .value = RISCV_CFG_IGNORE_TDATA1_DMODE },
 	{ .name = NULL, .value = RISCV_CFG_INVALID }
 };
 
@@ -731,6 +733,20 @@ static int riscv_jim_configure(struct target *target,
 		} else {
 			Jim_SetResultString(goi->interp,
 				jim_nvp_value2name_simple(nvp_on_off_opts, config->ignore_tinfo)->name, -1);
+		}
+		break;
+	case RISCV_CFG_IGNORE_TDATA1_DMODE:
+		if (goi->is_configure) {
+			struct jim_nvp *opt_nvp;
+			e = jim_getopt_nvp(goi, nvp_on_off_opts, &opt_nvp);
+			if (e != JIM_OK) {
+				jim_getopt_nvp_unknown(goi, nvp_on_off_opts, /*hadprefix*/ true);
+				return e;
+			}
+			config->ignore_tdata1_dmode = opt_nvp->value;
+		} else {
+			Jim_SetResultString(goi->interp,
+				jim_nvp_value2name_simple(nvp_on_off_opts, config->ignore_tdata1_dmode)->name, -1);
 		}
 		break;
 	default:
@@ -1009,6 +1025,15 @@ static int set_trigger(struct target *target, unsigned int idx, riscv_reg_t tdat
 		tdata1_ignore_mask |= !(misa_h && misa_s) ? CSR_ETRIGGER_VS : 0;
 		tdata1_ignore_mask |= !(misa_h && misa_u) ? CSR_ETRIGGER_VU : 0;
 		break;
+	}
+
+	/* With -ignore-tdata1-dmode, accept a trigger that reads back dmode 0.
+	 * M-mode code can then change the trigger. */
+	const riscv_reg_t dmode = CSR_TDATA1_DMODE(riscv_xlen(target));
+	if (riscv_private_config(target)->ignore_tdata1_dmode &&
+			(tdata1 & dmode) && !(tdata1_rb & dmode)) {
+		LOG_TARGET_DEBUG(target, "Trigger %u reads back dmode 0; ignored.", idx);
+		tdata1_ignore_mask |= dmode;
 	}
 
 	/* Determine if tdata1 supports what we need. */
@@ -6577,6 +6602,9 @@ static int get_trigger_types(struct target *target, unsigned int *trigger_tinfo,
 
 static int disable_trigger_if_dmode(struct target *target, riscv_reg_t tdata1)
 {
+	/* With -ignore-tdata1-dmode, a trigger that a debugger left behind has
+	 * dmode 0. Its action "enter Debug Mode" shows that it is one. */
+	const bool action_is_dmode = riscv_private_config(target)->ignore_tdata1_dmode;
 	bool dmode_is_set = false;
 	switch (get_field(tdata1, CSR_TDATA1_TYPE(riscv_xlen(target)))) {
 	case CSR_TDATA1_TYPE_LEGACY:
@@ -6585,10 +6613,14 @@ static int disable_trigger_if_dmode(struct target *target, riscv_reg_t tdata1)
 		dmode_is_set = true;
 		break;
 	case CSR_TDATA1_TYPE_MCONTROL:
-		dmode_is_set = tdata1 & CSR_MCONTROL_DMODE(riscv_xlen(target));
+		dmode_is_set = (tdata1 & CSR_MCONTROL_DMODE(riscv_xlen(target))) ||
+			(action_is_dmode &&
+			 get_field(tdata1, CSR_MCONTROL_ACTION) == CSR_MCONTROL_ACTION_DEBUG_MODE);
 		break;
 	case CSR_TDATA1_TYPE_MCONTROL6:
-		dmode_is_set = tdata1 & CSR_MCONTROL6_DMODE(riscv_xlen(target));
+		dmode_is_set = (tdata1 & CSR_MCONTROL6_DMODE(riscv_xlen(target))) ||
+			(action_is_dmode &&
+			 get_field(tdata1, CSR_MCONTROL6_ACTION) == CSR_MCONTROL6_ACTION_DEBUG_MODE);
 		break;
 	case CSR_TDATA1_TYPE_ICOUNT:
 		dmode_is_set = tdata1 & CSR_ICOUNT_DMODE(riscv_xlen(target));
