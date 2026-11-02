@@ -42,9 +42,7 @@ doc/openocd.cps
 doc/openocd.fn
 doc/openocd.fns
 doc/openocd.html
-doc/openocd.info
-doc/openocd.info-1
-doc/openocd.info-2
+doc/openocd.info*
 doc/openocd.ky
 doc/openocd.log
 doc/openocd.pdf
