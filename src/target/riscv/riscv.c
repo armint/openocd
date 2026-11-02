@@ -631,6 +631,7 @@ enum riscv_cfg_opts {
 	RISCV_CFG_CETRIG,
 	RISCV_CFG_DETECT_MISA,
 	RISCV_CFG_SBA_FLUSH_CACHE,
+	RISCV_CFG_IGNORE_TINFO,
 	RISCV_CFG_INVALID = -1
 };
 
@@ -639,6 +640,7 @@ static struct jim_nvp nvp_config_opts[] = {
 	{ .name = "-cetrig", .value = RISCV_CFG_CETRIG },
 	{ .name = "-detect-misa", .value = RISCV_CFG_DETECT_MISA },
 	{ .name = "-sba-flush-cache", .value = RISCV_CFG_SBA_FLUSH_CACHE },
+	{ .name = "-ignore-tinfo", .value = RISCV_CFG_IGNORE_TINFO },
 	{ .name = NULL, .value = RISCV_CFG_INVALID }
 };
 
@@ -715,6 +717,20 @@ static int riscv_jim_configure(struct target *target,
 		} else {
 			Jim_SetResultString(goi->interp,
 				jim_nvp_value2name_simple(nvp_on_off_opts, config->sba_flush_cache)->name, -1);
+		}
+		break;
+	case RISCV_CFG_IGNORE_TINFO:
+		if (goi->is_configure) {
+			struct jim_nvp *opt_nvp;
+			e = jim_getopt_nvp(goi, nvp_on_off_opts, &opt_nvp);
+			if (e != JIM_OK) {
+				jim_getopt_nvp_unknown(goi, nvp_on_off_opts, /*hadprefix*/ true);
+				return e;
+			}
+			config->ignore_tinfo = opt_nvp->value;
+		} else {
+			Jim_SetResultString(goi->interp,
+				jim_nvp_value2name_simple(nvp_on_off_opts, config->ignore_tinfo)->name, -1);
 		}
 		break;
 	default:
@@ -6534,8 +6550,8 @@ static int check_if_trigger_exists(struct target *target, unsigned int index)
 }
 
 /**
- * This function reads `tinfo` or `tdata1`, when reading `tinfo` fails,
- * to determine trigger types supported by a trigger.
+ * This function reads `tinfo` or `tdata1`, when reading `tinfo` fails
+ * or `-ignore-tinfo` is set, to determine trigger types supported by a trigger.
  * It is assumed that the trigger is already selected via writing `tselect`.
  */
 static int get_trigger_types(struct target *target, unsigned int *trigger_tinfo,
@@ -6543,7 +6559,8 @@ static int get_trigger_types(struct target *target, unsigned int *trigger_tinfo,
 {
 	assert(trigger_tinfo);
 	riscv_reg_t tinfo;
-	if (riscv_reg_get(target, &tinfo, GDB_REGNO_TINFO) == ERROR_OK) {
+	if (!riscv_private_config(target)->ignore_tinfo &&
+			riscv_reg_get(target, &tinfo, GDB_REGNO_TINFO) == ERROR_OK) {
 		/* tinfo.INFO == 1: trigger doesn’t exist
 		 * tinfo == 0 or tinfo.INFO != 1 and tinfo LSB is set: invalid tinfo */
 		if (tinfo == 0 || tinfo & 0x1)
@@ -6627,7 +6644,8 @@ int riscv_enumerate_triggers(struct target *target)
 	 * See https://github.com/riscv/riscv-debug-spec/pull/1081.
 	 */
 	riscv_reg_t tinfo;
-	if (riscv_reg_get(target, &tinfo, GDB_REGNO_TINFO) == ERROR_OK) {
+	if (!riscv_private_config(target)->ignore_tinfo &&
+			riscv_reg_get(target, &tinfo, GDB_REGNO_TINFO) == ERROR_OK) {
 		r->tinfo_version = get_field(tinfo, CSR_TINFO_VERSION);
 		LOG_TARGET_DEBUG(target, "Trigger tinfo.version = %d.", r->tinfo_version);
 	} else {

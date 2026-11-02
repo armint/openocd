@@ -12025,6 +12025,20 @@ when write memory via RISC-V Debug System Bus interface. Defaults to @option{off
 @end itemize
 @end itemize
 
+@itemize
+@item @code{-ignore-tinfo} @option{off}|@option{on} -- determines whether
+OpenOCD ignores the @var{tinfo} register when it enumerates the triggers.
+When @option{on}, OpenOCD reads the supported trigger type from
+@var{tdata1.type}, as for a hart without @var{tinfo}, and
+@var{tinfo.version} is unknown. Use this for a hart that does not implement
+@var{tinfo} but reads it as 0 without an exception, e.g. the WCH QingKe V4.
+Defaults to @option{off}.
+
+@itemize
+@item @code{cget} returns the currently configured state for @code{-ignore-tinfo}.
+@end itemize
+@end itemize
+
 @subsection RISC-V Debug Configuration Commands
 
 @deffn {Command} {riscv dump_sample_buf} [base64]
