@@ -218,4 +218,7 @@ size_t riscv_batch_available_scans(struct riscv_batch *batch);
 /* Return true iff the last scan in the batch returned DMI_OP_BUSY. */
 bool riscv_batch_was_batch_busy(const struct riscv_batch *batch);
 
+/* Return true iff the last scan in the batch returned DMI_OP_FAILED. */
+bool riscv_batch_was_batch_failed(const struct riscv_batch *batch);
+
 #endif /* OPENOCD_TARGET_RISCV_BATCH_H */

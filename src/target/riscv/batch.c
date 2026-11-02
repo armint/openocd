@@ -109,7 +109,7 @@ bool riscv_batch_full(struct riscv_batch *batch)
 	return riscv_batch_available_scans(batch) == 0;
 }
 
-static bool riscv_batch_was_scan_busy(const struct riscv_batch *batch,
+static uint32_t riscv_batch_get_scan_op(const struct riscv_batch *batch,
 		size_t scan_idx)
 {
 	assert(batch->was_run);
@@ -117,7 +117,13 @@ static bool riscv_batch_was_scan_busy(const struct riscv_batch *batch,
 	const struct scan_field *field = batch->fields + scan_idx;
 	assert(field->in_value);
 	const uint64_t in = buf_get_u64(field->in_value, 0, field->num_bits);
-	return get_field(in, DTM_DMI_OP) == DTM_DMI_OP_BUSY;
+	return get_field(in, DTM_DMI_OP);
+}
+
+static bool riscv_batch_was_scan_busy(const struct riscv_batch *batch,
+		size_t scan_idx)
+{
+	return riscv_batch_get_scan_op(batch, scan_idx) == DTM_DMI_OP_BUSY;
 }
 
 static void add_idle_before_batch(const struct riscv_batch *batch, size_t start_idx,
@@ -441,6 +447,14 @@ bool riscv_batch_was_batch_busy(const struct riscv_batch *batch)
 	assert(batch->used_scans);
 	assert(batch->last_scan == RISCV_SCAN_TYPE_NOP);
 	return riscv_batch_was_scan_busy(batch, batch->used_scans - 1);
+}
+
+bool riscv_batch_was_batch_failed(const struct riscv_batch *batch)
+{
+	assert(batch->was_run);
+	assert(batch->used_scans);
+	assert(batch->last_scan == RISCV_SCAN_TYPE_NOP);
+	return riscv_batch_get_scan_op(batch, batch->used_scans - 1) == DTM_DMI_OP_FAILED;
 }
 
 size_t riscv_batch_finished_scans(const struct riscv_batch *batch)

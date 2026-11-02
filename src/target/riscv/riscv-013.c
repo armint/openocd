@@ -2620,6 +2620,13 @@ static int batch_run_timeout(struct target *target, struct riscv_batch *batch)
 		assert(new_finished_scans >= finished_scans);
 		decrement_reset_delays_counter(target, new_finished_scans - finished_scans);
 		finished_scans = new_finished_scans;
+		if (riscv_batch_was_batch_failed(batch)) {
+			/* The op field is sticky, so one failed access fails the batch. */
+			LOG_TARGET_ERROR(target, "DMI operation failed (op 2).");
+			if (dtmcs_scan(target->tap, DTM_DTMCS_DMIRESET, NULL /* discard result */) != ERROR_OK)
+				LOG_TARGET_DEBUG(target, "dmireset failed.");
+			return ERROR_FAIL;
+		}
 		if (!riscv_batch_was_batch_busy(batch)) {
 			assert(finished_scans == batch->used_scans);
 			return ERROR_OK;
