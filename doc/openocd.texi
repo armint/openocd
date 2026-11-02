@@ -7451,6 +7451,10 @@ The bank base must be 0x08000000. On the CH32V20x, erased flash reads
 flash bank $_FLASHNAME ch32v 0x08000000 0 0 0 $_TARGETNAME
 @end example
 
+The WCH SDK links programs to 0x00000000, where the chip maps the flash at
+boot. The target configs in @file{target/wch/} add a @code{virtual} bank at
+that address.
+
 @command{flash protect} changes the write protection bytes of the option
 bytes. Changes to the option bytes take effect after a reset of the target.
 
