@@ -3049,21 +3049,29 @@ static int deassert_reset(struct target *target)
 			RISCV_DELAY_BASE);
 	int64_t then = timeval_ms() + 1000 * riscv_get_command_timeout_sec();
 	LOG_TARGET_DEBUG(target, "Waiting for hart to come out of reset.");
+	/* With reset_halt, also wait for the halt: acking havereset below clears
+	 * haltreq, and some harts (e.g. WCH CH32V208) set allhavereset before
+	 * they halt. An unavailable hart cannot halt, so do not wait for it. */
 	do {
 		result = dmstatus_read(target, &dmstatus, true);
 		if (result != ERROR_OK)
 			return result;
 
 		if (timeval_ms() > then) {
-			LOG_TARGET_ERROR(target, "Hart didn't leave reset in %ds; "
-					"dmstatus=0x%x (allunavail=%s, allhavereset=%s); "
+			LOG_TARGET_ERROR(target, "Hart didn't %s in %ds; "
+					"dmstatus=0x%x (allunavail=%s, allhavereset=%s, allhalted=%s); "
 					"Increase the timeout with riscv set_command_timeout_sec.",
+					get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET) ?
+						"halt after reset" : "leave reset",
 					riscv_get_command_timeout_sec(), dmstatus,
 					get_field(dmstatus, DM_DMSTATUS_ALLUNAVAIL) ? "true" : "false",
-					get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET) ? "true" : "false");
+					get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET) ? "true" : "false",
+					get_field(dmstatus, DM_DMSTATUS_ALLHALTED) ? "true" : "false");
 			return ERROR_TIMEOUT_REACHED;
 		}
-	} while (!get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET));
+	} while (!get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET) ||
+			(target->reset_halt && !get_field(dmstatus, DM_DMSTATUS_ALLHALTED) &&
+			 !get_field(dmstatus, DM_DMSTATUS_ALLUNAVAIL)));
 
 	riscv_scan_set_delay(&info->learned_delays, RISCV_DELAY_BASE,
 			orig_base_delay);
