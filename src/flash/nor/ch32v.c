@@ -2,7 +2,7 @@
 
 /*
  * Flash driver for the WCH CH32V003, CH32V00X (CH32V002, CH32V004,
- * CH32V005, CH32V006, CH32V007) and CH32V20x.
+ * CH32V005, CH32V006, CH32V007), CH32V20x and CH32V30x.
  *
  * Written from the reference manuals: CH32V003RM (chapter 16),
  * CH32V00XRM (chapter 18) and CH32FV2x_V3xRM (chapter 32).
@@ -75,6 +75,7 @@ enum ch32v_family {
 	CH32V003,
 	CH32V00X,
 	CH32V20X,
+	CH32V30X,
 };
 
 struct ch32v_family_info {
@@ -90,6 +91,8 @@ struct ch32v_family_info {
 	bool option_strt;
 	// Content of an erased word
 	uint32_t erased_word;
+	// Size of the whole flash in KiB, 0: ESIG_FLACAP gives it
+	uint32_t flash_size_kb;
 };
 
 static const struct ch32v_family_info ch32v_families[] = {
@@ -115,6 +118,16 @@ static const struct ch32v_family_info ch32v_families[] = {
 		.option_count = 8,
 		.pgstrt_method = true,
 		.erased_word = 0xe339e339,
+	},
+	[CH32V30X] = {
+		.name = "CH32V30x",
+		.page_size = 256,
+		.wrp_unit = 4096,
+		.option_count = 8,
+		.pgstrt_method = true,
+		.erased_word = 0xe339e339,
+		// ESIG_FLACAP gives the largest zero-wait code area (288 KiB)
+		.flash_size_kb = 480,
 	},
 };
 
@@ -620,8 +633,8 @@ static int ch32v_probe(struct flash_bank *bank)
 	ch32v_info->probed = false;
 
 	/* The CH32V003 has its chip ID at 0x1ffff7c4. There, the CH32V00X reads
-	 * 0xffffffff. The CH32V00X and the CH32V20x have it at 0x1ffff704, which
-	 * is in the boot code of the CH32V003. */
+	 * 0xffffffff. The CH32V00X, the CH32V20x and the CH32V30x have it at
+	 * 0x1ffff704, which is in the boot code of the CH32V003. */
 	uint32_t chip_id;
 	int retval = target_read_u32(target, CHIP_ID_V003, &chip_id);
 	if (retval != ERROR_OK)
@@ -642,11 +655,14 @@ static int ch32v_probe(struct flash_bank *bank)
 			family = CH32V00X;
 			break;
 		default:
-			if ((chip_id >> 24) != 0x20) {
+			if ((chip_id >> 24) == 0x20) {
+				family = CH32V20X;
+			} else if ((chip_id >> 24) == 0x30) {
+				family = CH32V30X;
+			} else {
 				LOG_ERROR("Unknown chip ID 0x%08" PRIx32, chip_id);
 				return ERROR_FLASH_OPERATION_FAILED;
 			}
-			family = CH32V20X;
 			break;
 		}
 	}
@@ -661,12 +677,13 @@ static int ch32v_probe(struct flash_bank *bank)
 	}
 
 	const struct ch32v_family_info *info = &ch32v_families[family];
+	const uint32_t flash_kb = info->flash_size_kb ? info->flash_size_kb : size_kb;
 	ch32v_info->chip_id = chip_id;
 	ch32v_info->info = info;
 
 	free(bank->sectors);
 	free(bank->prot_blocks);
-	bank->size = size_kb * 1024;
+	bank->size = flash_kb * 1024;
 	bank->num_sectors = bank->size / info->page_size;
 	bank->sectors = alloc_block_array(0, info->page_size, bank->num_sectors);
 	// FLASH_WPR has 32 bits. The last one covers the rest of a larger flash.
@@ -680,8 +697,15 @@ static int ch32v_probe(struct flash_bank *bank)
 	bank->write_start_alignment = info->page_size;
 	bank->write_end_alignment = info->page_size;
 
-	LOG_INFO("%s, chip ID 0x%08" PRIx32 ", %" PRIu16 " KiB flash",
-			info->name, chip_id, size_kb);
+	LOG_INFO("%s, chip ID 0x%08" PRIx32 ", %" PRIu32 " KiB flash",
+			info->name, chip_id, flash_kb);
+	if (info->flash_size_kb) {
+		// SRAM_CODE_MODE, OBR bits 9..7: 00x, 01x, 10x, 110, 111
+		static const uint16_t code_kb[] = { 192, 192, 224, 224, 256, 256, 128, 288 };
+		uint32_t obr;
+		if (target_read_u32(target, FLASH_OBR, &obr) == ERROR_OK)
+			LOG_INFO("Zero-wait code area: %" PRIu16 " KiB", code_kb[(obr >> 7) & 7]);
+	}
 	ch32v_info->probed = true;
 	return ERROR_OK;
 }

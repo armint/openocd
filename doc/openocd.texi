@@ -7437,15 +7437,22 @@ flash bank $_FLASHNAME cc3220sf 0 0 0 0 $_TARGETNAME
 
 @deffn {Flash Driver} {ch32v}
 This driver supports the internal flash of the WCH CH32V003, the CH32V00X
-family (CH32V002, CH32V004, CH32V005, CH32V006, CH32V007) and the CH32V20x
-family. These are RISC-V microcontrollers. The driver reads the chip ID and
-the flash size from the chip, and uses the fast page programming of the flash
+family (CH32V002, CH32V004, CH32V005, CH32V006, CH32V007), the CH32V20x
+family and the CH32V30x family. These are RISC-V microcontrollers. The driver
+reads the chip ID and the flash size from the chip, and uses the fast page programming of the flash
 controller. Pages are 64 bytes on the CH32V003 and 256 bytes on the other
 families. Writes run a small loader in the working area, which must hold the
 loader and at least one page.
 
-The bank base must be 0x08000000. On the CH32V20x, erased flash reads
-0xe339e339, not 0xffffffff. @command{flash erase_check} knows this.
+The bank base must be 0x08000000. On the CH32V20x and the CH32V30x, erased
+flash reads 0xe339e339, not 0xffffffff. @command{flash erase_check} knows
+this.
+
+On the CH32V30x, the bank is the whole flash of 480 KiB. At reset, the chip
+copies the first part, the zero-wait code area, to fast memory, and runs the
+code from there. SRAM_CODE_MODE in the USER option byte sets the size of the
+code area. Code above the code area runs from the slower flash. The driver
+logs the size of the code area.
 
 @example
 flash bank $_FLASHNAME ch32v 0x08000000 0 0 0 $_TARGETNAME
