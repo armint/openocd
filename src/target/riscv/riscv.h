@@ -413,6 +413,7 @@ struct riscv_private_config {
 	bool sba_flush_cache;
 	bool ignore_tinfo;
 	bool ignore_tdata1_dmode;
+	bool ignore_resumeack;
 };
 
 static inline struct riscv_private_config

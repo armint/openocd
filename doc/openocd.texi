@@ -12105,6 +12105,21 @@ hart such a trigger does not halt the hart. Defaults to @option{off}.
 @end itemize
 @end itemize
 
+@itemize
+@item @code{-ignore-resumeack} @option{off}|@option{on} -- determines whether
+OpenOCD accepts a resume that @var{dmstatus.allresumeack} does not
+acknowledge. When @option{on}, a resume is complete when
+@var{dmstatus.allrunning} is set, and a single step is complete when
+@var{dmstatus.allhalted} is set. Use this only for a hart that never sets
+@var{allresumeack}, e.g. the WCH QingKe V4F of the CH32V30x. Without the
+acknowledge, OpenOCD cannot tell a hart that completed a single step from a
+hart that did not start it yet. Defaults to @option{off}.
+
+@itemize
+@item @code{cget} returns the currently configured state for @code{-ignore-resumeack}.
+@end itemize
+@end itemize
+
 @subsection RISC-V Debug Configuration Commands
 
 @deffn {Command} {riscv dump_sample_buf} [base64]

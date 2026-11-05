@@ -5793,6 +5793,9 @@ static int riscv013_step_or_resume_current_hart(struct target *target,
 
 	dmcontrol = set_field(dmcontrol, DM_DMCONTROL_RESUMEREQ, 0);
 
+	/* With -ignore-resumeack, a hart that never sets allresumeack counts as
+	 * resumed when it runs, and a single step as done when the hart halts. */
+	const bool ignore_resumeack = riscv_private_config(target)->ignore_resumeack;
 	uint32_t dmstatus;
 	for (size_t i = 0; i < 256; ++i) {
 		usleep(10);
@@ -5800,7 +5803,9 @@ static int riscv013_step_or_resume_current_hart(struct target *target,
 			return ERROR_FAIL;
 		if (get_field(dmstatus, DM_DMSTATUS_ALLUNAVAIL))
 			return ERROR_FAIL;
-		if (get_field(dmstatus, DM_DMSTATUS_ALLRESUMEACK) == 0)
+		if (get_field(dmstatus, DM_DMSTATUS_ALLRESUMEACK) == 0 &&
+				!(ignore_resumeack && get_field(dmstatus,
+					step ? DM_DMSTATUS_ALLHALTED : DM_DMSTATUS_ALLRUNNING)))
 			continue;
 		if (step && get_field(dmstatus, DM_DMSTATUS_ALLHALTED) == 0)
 			continue;

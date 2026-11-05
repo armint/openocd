@@ -633,6 +633,7 @@ enum riscv_cfg_opts {
 	RISCV_CFG_SBA_FLUSH_CACHE,
 	RISCV_CFG_IGNORE_TINFO,
 	RISCV_CFG_IGNORE_TDATA1_DMODE,
+	RISCV_CFG_IGNORE_RESUMEACK,
 	RISCV_CFG_INVALID = -1
 };
 
@@ -643,6 +644,7 @@ static struct jim_nvp nvp_config_opts[] = {
 	{ .name = "-sba-flush-cache", .value = RISCV_CFG_SBA_FLUSH_CACHE },
 	{ .name = "-ignore-tinfo", .value = RISCV_CFG_IGNORE_TINFO },
 	{ .name = "-ignore-tdata1-dmode", .value = RISCV_CFG_IGNORE_TDATA1_DMODE },
+	{ .name = "-ignore-resumeack", .value = RISCV_CFG_IGNORE_RESUMEACK },
 	{ .name = NULL, .value = RISCV_CFG_INVALID }
 };
 
@@ -747,6 +749,20 @@ static int riscv_jim_configure(struct target *target,
 		} else {
 			Jim_SetResultString(goi->interp,
 				jim_nvp_value2name_simple(nvp_on_off_opts, config->ignore_tdata1_dmode)->name, -1);
+		}
+		break;
+	case RISCV_CFG_IGNORE_RESUMEACK:
+		if (goi->is_configure) {
+			struct jim_nvp *opt_nvp;
+			e = jim_getopt_nvp(goi, nvp_on_off_opts, &opt_nvp);
+			if (e != JIM_OK) {
+				jim_getopt_nvp_unknown(goi, nvp_on_off_opts, /*hadprefix*/ true);
+				return e;
+			}
+			config->ignore_resumeack = opt_nvp->value;
+		} else {
+			Jim_SetResultString(goi->interp,
+				jim_nvp_value2name_simple(nvp_on_off_opts, config->ignore_resumeack)->name, -1);
 		}
 		break;
 	default:
